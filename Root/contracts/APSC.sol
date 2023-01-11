@@ -1,28 +1,10 @@
 // SPDX-License-Identifier:MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-interface AttributeContract {
-    function getAttribute(address _address, string memory _attrName)
-        external
-        view
-        returns (string[] memory _attrValue);
 
-    function addPolicy(        
-        address _resource,       
-        string[] memory _attrs,
-        string memory _action
-    ) external;
+contract APSC {
 
-    function accessControl(
-        address _from,
-        address _resource,
-        string memory _action
-    ) external view returns (bool);
-}
-
-contract AccessControl {
-
-    //variables
+ //variables
     address owner;
 
     // constructor
@@ -30,8 +12,7 @@ contract AccessControl {
         owner = msg.sender;
     }
 
-    //Event
-    event ReturnAccessResult(address indexed from, string result);
+    //Event    
     event AddPolicyEvent(
          uint requestId,
         address resource,
@@ -44,16 +25,23 @@ contract AccessControl {
         address resource,
         string[] sa,
         string[] oa,
-        string action , 
-        uint smartContractStartTime
+        string action        
+    );
+    event DeletePolicyEvent(
+         uint requestId,
+        address resource,
+        string[] sa,
+        string[] oa,
+        string action       
     );
     event CallbackAddPolicyEvent(uint requestId, bool result);
     event CallbackUpdatePolicyEvent(uint requestId, bool result);
-    event AccessControlEvent(uint requestId, address from, address resource, string action);
-    event CallbackAccessControlEvent(uint requestId , string result);
+    event CallbackDeletePolicyEvent(uint requestId, bool result);
+    
 
      
 
+    // add Policy
     function addPolicy(
         uint _requestId,       //Request order Id
         address _resource,     //Object Address
@@ -64,7 +52,7 @@ contract AccessControl {
         public
     {
  
-        require(msg.sender == owner, "addPolicy error: Caller is not owner!"); // If it is incorrect here, it reve 
+        require(msg.sender == owner, "addPolicy error: Caller is not owner!");  
         require(_sa.length % 2 != 0, "addPolicy error: invalid experssion!");
         require(_oa.length % 2 != 0, "addPolicy error: invalid experssion!");
 
@@ -97,25 +85,73 @@ contract AccessControl {
         emit CallbackAddPolicyEvent(requestId , isOk);
     }
 
-  
 
 
+    // update Policy
+    function updatePolicy(
+        uint _requestId,       //Request order Id
+        address _resource,     //Object Address
+        string[] memory _sa,   //Subject Attributes
+        string[] memory _oa,   //Object Attributes
+        string memory _action  //Operation
+    )
+        public
+    {
+ 
+        require(msg.sender == owner, "addPolicy error: Caller is not owner!"); 
+        require(_sa.length % 2 != 0, "addPolicy error: invalid experssion!");
+        require(_oa.length % 2 != 0, "addPolicy error: invalid experssion!");
 
+        for (uint256 i = 0; i < _sa.length; i += 4) {
+            if (
+                !stringCompare(_sa[i + 2], ">") &&
+                !stringCompare(_sa[i + 2], "<") &&
+                !stringCompare(_sa[i + 2], "=") &&
+                !stringCompare(_sa[i + 2], "!=")
+            ) {
+                revert("addPolicy error: operator should be >, < or =");
+            }
+        }
 
-
-          
-    function accessControl(uint requestId, address _resource, string memory _action) public {            
-        emit AccessControlEvent(requestId ,  msg.sender, _resource, _action );
+        for (uint256 i = 0; i < _oa.length; i += 4) {
+            if (
+                !stringCompare(_oa[i + 2], ">") &&
+                !stringCompare(_oa[i + 2], "<") &&
+                !stringCompare(_oa[i + 2], "=") &&
+                !stringCompare(_oa[i + 2], "!=")
+            ) {
+                revert("addPolicy error: operator should be >, < or =");
+            }
+        } 
+         
+        emit UpdatePolicyEvent( _requestId,_resource, _sa, _oa, _action);
     }
 
-    function callbackAccessControl(uint _requestId, bool sa_result, bool oa_result) public
-    {         
-        if (sa_result && oa_result)
-            emit CallbackAccessControlEvent(_requestId , "Allow" );
-        else
-            emit CallbackAccessControlEvent(_requestId , "Deny" );
+    function callbackUpdatePolicy(uint requestId, bool isOk) public {       
+        emit CallbackUpdatePolicyEvent(requestId , isOk);
     }
+   
     
+
+    // delete Policy
+    function deletePolicy(
+        uint _requestId,       //Request order Id
+        address _resource,     //Object Address
+        string[] memory _sa,   //Subject Attributes
+        string[] memory _oa,   //Object Attributes
+        string memory _action  //Operation
+    )
+        public
+    {
+ 
+        require(msg.sender == owner, "addPolicy error: Caller is not owner!");     
+         
+        emit DeletePolicyEvent( _requestId,_resource, _sa, _oa, _action);
+    }
+
+    function callbackDeletePolicy(uint requestId, bool isOk) public {       
+        emit CallbackDeletePolicyEvent(requestId , isOk);
+    }
 
     function stringCompare(string memory a, string memory b)
         public
@@ -152,4 +188,5 @@ contract AccessControl {
             }
         }
     }
+
 }

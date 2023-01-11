@@ -1,49 +1,24 @@
 // SPDX-License-Identifier:MIT
 pragma solidity >=0.4.22 <0.9.0;
+ 
 
-contract ObjectContract {
+contract APMC { 
+
+     //variables
+    Callee instance;
+    mapping(address => mapping(string => PolicyItem[])) internal policies;
     
-    //variables
-    mapping(address => Resource) lookupTable;
-    mapping(address => mapping(string => PolicyItem[])) policies;
+     constructor( address _OAMC)
+     {
+          instance=Callee(_OAMC);         
+     }
 
-    //Struct
+   
+
+     //Struct
     struct PolicyItem {
         string[] attr; //Object attributes
         string action; //Operation
-    }
-
-    struct Resource {
-        bool isValued;
-        address manager;
-        mapping(string => AttrValue) attrbutes;
-    }
-
-    struct AttrValue {
-        bool isValued;        // check for duplicate 
-        string value;         // attribute value
-        string[] parentAttr;  // parent attributes
-    }
- 
-
-    //modifier
-    modifier isRegister(address _address) {
-        require(lookupTable[_address].isValued, "Address not registered!");
-        _;
-    }
-
-    modifier isAttributeExist(address _address, string memory _attrName) {
-        require(
-            !lookupTable[_address].attrbutes[_attrName].isValued,
-            "add Attribute error: Attribute already exist!"
-        );
-        _;
-    }
-
-    //Register Object
-    function register(address _address) public {
-        lookupTable[_address].manager = msg.sender;
-        lookupTable[_address].isValued = true;
     }
 
     //add policy for Object
@@ -55,47 +30,25 @@ contract ObjectContract {
         policies[_resource][_action].push(PolicyItem(_attrs, _action));        
     } 
 
-    //add Attribute for Object
-    function addAttribute(
-        address _address,        //Object Address
-        string memory _attrName, //Object Attribute name
-        string memory _attrValue,//Object Attribute value
-        string[] memory _parent  //Object Attribute parents
-    ) public isRegister(_address) {
-        lookupTable[_address].attrbutes[_attrName].value = _attrValue;
-        lookupTable[_address].attrbutes[_attrName].parentAttr = _parent;
-        lookupTable[_address].attrbutes[_attrName].isValued = true;
-    }
+    //update policy for Object
+    function updatePolicy(        
+        address _resource,     //Object Address
+        string[] memory _attrs,//Object Attributes
+        string memory _action  //Operation
+    ) public {         
+        policies[_resource][_action].push(PolicyItem(_attrs, _action));        
+    } 
 
-    // find attributes
-    function getAttribute(address _address, string memory _attrName)
-        public
-        view
-        isRegister(_address)
-        returns (string[] memory _attrValue)
-    {
-        string[] memory result = new string[](
-            lookupTable[_address].attrbutes[_attrName].parentAttr.length + 1
-        );
+     //delete policy for Object
+    function deletePolicy(        
+        address _resource,     //Object Address       
+        string memory _action  //Operation
+    ) public {         
+       delete policies[_resource][_action];        
+    } 
 
-        result[0] = lookupTable[_address].attrbutes[_attrName].value;
-
-        for (
-            uint256 i = 0;
-            i < lookupTable[_address].attrbutes[_attrName].parentAttr.length;
-            i++
-        ) {
-            result[i + 1] = lookupTable[_address]
-                .attrbutes[_attrName]
-                .parentAttr[i];
-        }
-
-        return result;
-    }
-
-    
     //check Access control request
-    function accessControl(
+    function checkPolicy(
         address _from,
         address _resource,
         string memory _action
@@ -107,7 +60,7 @@ contract ObjectContract {
         }
 
         for (uint256 i = 0; i < policies[_resource][_action].length; i++) {
-            bool isMatchPolicy = fetchAttribute(
+            bool isMatchPolicy = findAttr(
                 _from,
                 policies[_resource][_action][i].attr
             );
@@ -118,7 +71,7 @@ contract ObjectContract {
         return (false, firstTime);
     }
 
-    function fetchAttribute(address _resource, string[] memory _policyAttr)
+    function findAttr(address _resource, string[] memory _policyAttr)
         private
         view
         returns (bool)
@@ -135,8 +88,8 @@ contract ObjectContract {
         uint256 expersionCounter = 0;
 
         for (uint256 i = 0; i < _policyAttr.length; i += 4) {
-            attrValue = getAttribute(_resource, _policyAttr[i]);
-            bool result = compareAttribute(
+            attrValue = instance.expand(_resource, _policyAttr[i]);
+            bool result = matchAttr(
                 _policyAttr[i + 1],
                 attrValue,
                 _policyAttr[i + 2]
@@ -152,7 +105,7 @@ contract ObjectContract {
         return parseExperssion(expersion);
     }
 
-    function compareAttribute(
+    function matchAttr(
         string memory _policyAttrVal,
         string[] memory _attrValue,
         string memory _operator
@@ -265,4 +218,13 @@ contract ObjectContract {
             }
         }
     }
+
+}
+
+interface Callee
+{
+    function expand(address _address, string memory _attrName)
+        external
+        view        
+        returns (string[] memory _attrValue);
 }
